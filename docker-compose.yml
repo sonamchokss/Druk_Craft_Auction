@@ -1,0 +1,112 @@
+# Druk Craft Auction — run everything with:  docker compose up --build
+# Day-1 skeleton. Integration owner: Sonam Choki (feature/docker-compose).
+
+x-service-env: &service-env
+  RABBITMQ_URL: amqp://auction:auction@rabbitmq:5672/
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: auction
+      RABBITMQ_DEFAULT_PASS: auction
+    # Infra ports are bound to localhost only: the credentials are lab defaults,
+    # so they must not be reachable from other machines on the network.
+    ports:
+      - "127.0.0.1:5672:5672"     # AMQP
+      - "127.0.0.1:15672:15672"   # management UI — http://localhost:15672 (auction / auction)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: auction
+      POSTGRES_PASSWORD: auction
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro   # creates the five per-service databases
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auction"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  listing:
+    <<: *service
+    build: { context: ., dockerfile: listing/Dockerfile }
+    environment:
+      <<: *service-env
+      PORT: "8001"
+      DATABASE_URL: postgres://auction:auction@postgres:5432/listings_db?sslmode=disable
+    ports: ["8001:8001"]
+    healthcheck: &health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:$$PORT/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  bidding:
+    <<: *service
+    build: { context: ., dockerfile: bidding/Dockerfile }
+    environment:
+      <<: *service-env
+      PORT: "8002"
+      DATABASE_URL: postgres://auction:auction@postgres:5432/bids_db?sslmode=disable
+    ports: ["8002:8002"]
+    healthcheck: *health
+
+  timer:
+    <<: *service
+    build: { context: ., dockerfile: timer/Dockerfile }
+    environment:
+      <<: *service-env
+      PORT: "8003"
+      DATABASE_URL: postgres://auction:auction@postgres:5432/timers_db?sslmode=disable
+    ports: ["8003:8003"]
+    healthcheck: *health
+
+  payment:
+    <<: *service
+    build: { context: ., dockerfile: payment/Dockerfile }
+    environment:
+      <<: *service-env
+      PORT: "8004"
+      DATABASE_URL: postgres://auction:auction@postgres:5432/payments_db?sslmode=disable
+    ports: ["8004:8004"]
+    healthcheck: *health
+
+  notification:
+    <<: *service
+    build: { context: ., dockerfile: notification/Dockerfile }
+    environment:
+      <<: *service-env
+      PORT: "8005"
+      DATABASE_URL: postgres://auction:auction@postgres:5432/notifications_db?sslmode=disable
+    ports: ["8005:8005"]
+    healthcheck: *health
+
+  # frontend:  (Sonam Wangmo — enable once /frontend has a Dockerfile)
+  #   build: ./frontend
+  #   ports: ["3000:3000"]
+  #   depends_on: [listing, bidding, payment, notification]
+
+volumes:
+  rabbitmq-data:
+  postgres-data:
