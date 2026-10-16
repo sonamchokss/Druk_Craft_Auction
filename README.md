@@ -58,7 +58,7 @@ go func() {
 app.Run(ctx)
 ```
 
-The shared retry / DLQ / idempotency helper is coming in `feature/reliability` (Sangay Choden).
+The shared retry / DLQ / idempotency helper is available in `shared/reliability` (Sangay Choden). See [reliability and demo instructions](docs/reliability.md).
 
 ## Git workflow
 
