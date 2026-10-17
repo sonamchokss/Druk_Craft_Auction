@@ -1,0 +1,5 @@
+# Local Payment run: Postgres is reachable on the Compose network only.
+# Use with: docker compose -f docker-compose.yml -f payment/compose.local.yml up --build -d payment
+services:
+  postgres:
+    ports: !reset []
