@@ -1,5 +1,6 @@
 # Go
 *.exe
+*.log
 *.test
 *.out
 /bin/
