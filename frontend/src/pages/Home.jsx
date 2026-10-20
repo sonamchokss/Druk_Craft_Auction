@@ -1,5 +1,6 @@
 import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { AuctionCard } from '../components/AuctionCard'
 export function Home() { const [items, setItems] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [filter, setFilter] = useState('All crafts')
