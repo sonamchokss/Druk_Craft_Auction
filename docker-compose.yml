@@ -17,9 +17,12 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: druk-rabbitmq
+    # Infra ports are localhost-only: they use default credentials and must not be
+    # reachable from other machines (e.g. campus Wi-Fi during the demo). Services
+    # reach them over the Docker network, so this changes nothing for the app.
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Management UI
+      - "127.0.0.1:5672:5672"     # AMQP
+      - "127.0.0.1:15672:15672"   # Management UI
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
@@ -37,7 +40,7 @@ services:
     image: postgres:16-alpine
     container_name: druk-postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -131,7 +134,7 @@ services:
     build: ./frontend
     container_name: druk-frontend
     ports: ["3000:3000"]   # nginx.conf listens on 3000
-    depends_on: [listing, bidding, notification]
+    depends_on: [rabbitmq, listing, bidding, notification]   # nginx proxies /mq/queues to rabbitmq
     restart: unless-stopped
 
 volumes:

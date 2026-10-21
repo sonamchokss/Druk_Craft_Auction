@@ -46,6 +46,9 @@ export const mockApi = {
       if (new Date(item.endsAt).getTime() - Date.now() < 10000) { item.endsAt = new Date(Date.now() + 30000).toISOString(); emit(event('AuctionExtended', { auctionId: id, newEndsAt: item.endsAt })) }
       return wait(bid)
     },
+    byBidder: (bidderId) => wait(listings.flatMap((item) => (bidMap[item.id] || [])
+      .filter((bid) => bid.bidderId === bidderId)
+      .map((bid) => ({ ...bid, auctionId: item.id, title: item.title, auctionStatus: item.status === 'Open' ? 'open' : 'closed', isHighest: item.highestBidder === bidderId && item.currentBid === bid.amount })))),
   },
   payments: {
     all: (buyerId) => wait([{ receiptNo: 'RCP-2026-0041', amount: 3900, auction: 'Carved Juniper Offering Bowl', auctionId: 'lot-103', status: 'Completed' }, { receiptNo: 'RCP-2026-0038', amount: 7200, auction: 'Lotus Offering Bowl', auctionId: 'lot-098', status: 'Completed' }].filter((receipt) => buyerId === 'U-3')),

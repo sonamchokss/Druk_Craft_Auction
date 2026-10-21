@@ -25,7 +25,9 @@ func (a *API) Handler() http.Handler {
 }
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		// Any origin, like the other services: the second demo laptop loads the
+		// UI from http://<host-ip>:3000, which a fixed localhost origin blocks.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,PATCH,OPTIONS")
 		if r.Method == "OPTIONS" {
