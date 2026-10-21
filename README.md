@@ -41,6 +41,9 @@ Auctions shorter than 30 s are extended by the anti-sniping rule as soon as anyo
 ```
 docs/events.md      ← the event contract. Read this first.
 docs/reliability.md ← retry / DLQ / idempotency and the failure demo
+docs/testing.md     ← how to run the tests, and the recorded T1–T11 results
+docs/handover.md    ← what changed in each member's area during integration
+scripts/            ← integration_test.py (T1–T11 against the running stack)
 shared/             ← Go code shared by bidding, timer and payment
   events/           envelope + payload types for all 6 events
   rabbitmq/         Connect (retry), DeclareTopology, Publisher
