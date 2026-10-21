@@ -48,20 +48,26 @@ func (c *Consumer) consume(ctx context.Context) error {
 	if err = ch.ExchangeDeclare("auction.events", "topic", true, false, false, false, nil); err != nil {
 		return err
 	}
-	if err = ch.ExchangeDeclare("auction.dlx", "topic", true, false, false, false, nil); err != nil {
+	// Must match docs/events.md §5 exactly: RabbitMQ rejects (406) any
+	// re-declaration whose type or arguments differ from the other services'.
+	if err = ch.ExchangeDeclare("auction.dlx", "direct", true, false, false, false, nil); err != nil {
 		return err
 	}
 	if _, err = ch.QueueDeclare("notification.dlq", true, false, false, false, nil); err != nil {
 		return err
 	}
-	args := amqp091.Table{"x-dead-letter-exchange": "auction.dlx"}
+	args := amqp091.Table{
+		"x-dead-letter-exchange":    "auction.dlx",
+		"x-dead-letter-routing-key": "notification.queue",
+	}
 	if _, err = ch.QueueDeclare("notification.queue", true, false, false, false, args); err != nil {
 		return err
 	}
 	if err = ch.QueueBind("notification.queue", "#", "auction.events", false, nil); err != nil {
 		return err
 	}
-	if err = ch.QueueBind("notification.dlq", "#", "auction.dlx", false, nil); err != nil {
+	// Bound by queue name so only notification.queue's rejects land here.
+	if err = ch.QueueBind("notification.dlq", "notification.queue", "auction.dlx", false, nil); err != nil {
 		return err
 	}
 	if err = ch.Qos(10, 0, false); err != nil {
@@ -101,6 +107,7 @@ func (c *Consumer) handle(ctx context.Context, ch *amqp091.Channel, message amqp
 		c.mu.Lock()
 		bidders, _ := c.Store.Bidders(ctx, auctionID)
 		notes, newBidders, mapErr := Map(c.Cache, envelope, bidders)
+		err = mapErr // a mapping failure must be retried, not acked as processed
 		if mapErr == nil {
 			err = c.Store.Process(ctx, eventID, notes, newBidders, auctionID)
 			if err == nil {
@@ -130,7 +137,20 @@ func (c *Consumer) handle(ctx context.Context, ch *amqp091.Channel, message amqp
 	}
 	if retries < 3 {
 		headers := amqp091.Table{"x-retry-count": int32(retries + 1)}
-		_ = ch.PublishWithContext(ctx, "auction.events", message.RoutingKey, false, false, amqp091.Publishing{ContentType: "application/json", Body: message.Body, Headers: headers})
+		// Default exchange straight to our own queue: re-publishing to auction.events
+		// would deliver the event to every other service again.
+		pubErr := ch.PublishWithContext(ctx, "", "notification.queue", false, false, amqp091.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp091.Persistent,
+			MessageId:    message.MessageId,
+			Type:         message.Type,
+			Body:         message.Body,
+			Headers:      headers,
+		})
+		if pubErr != nil {
+			_ = message.Nack(false, true) // keep the original rather than lose it
+			return
+		}
 		_ = message.Ack(false)
 		logResult("retry")
 		return
