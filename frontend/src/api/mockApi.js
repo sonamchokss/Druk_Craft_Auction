@@ -29,7 +29,7 @@ export const mockApi = {
   listings: {
     all: () => wait(listings),
     get: (id) => wait(listings.find((item) => item.id === id)),
-    create: async (data) => { const item = { ...data, id: `lot-${Date.now()}`, category: 'New listing', artisan: 'You', artisanId: 'A-1', currentBid: data.startPrice, status: 'Draft', bids: 0 }; listings = [item, ...listings]; return wait(item) },
+    create: async (data) => { const item = { ...data, id: `lot-${Date.now()}`, category: data.category || 'New listing', artisan: 'You', artisanId: 'A-1', currentBid: data.startPrice, status: 'Draft', bids: 0 }; listings = [item, ...listings]; return wait(item) },
     start: async (id) => { const item = listings.find((entry) => entry.id === id); item.status = 'Open'; item.endsAt = new Date(Date.now() + item.duration * 60000).toISOString(); emit(event('AuctionStarted', { auctionId: id })); return wait(item) },
   },
   bids: {

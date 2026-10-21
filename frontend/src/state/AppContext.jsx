@@ -1,12 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { api, config } from '../api'
+import { users } from './users'
 
-const users = [
-  { id: 'U-3', name: 'Tashi Choden', role: 'Buyer', initials: 'TC' },
-  { id: 'U-7', name: 'Dorji Wangchuk', role: 'Buyer', initials: 'DW' },
-  { id: 'U-9', name: 'Pema Lhamo', role: 'Buyer', initials: 'PL' },
-  { id: 'A-1', name: 'Karma Artisans', role: 'Artisan', initials: 'KA' },
-]
 const AppContext = createContext(null)
 export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => users.find((user) => user.id === localStorage.getItem('druk-user')) || users[0])
