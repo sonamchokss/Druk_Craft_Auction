@@ -134,7 +134,7 @@ services:
     build: ./frontend
     container_name: druk-frontend
     ports: ["3000:3000"]   # nginx.conf listens on 3000
-    depends_on: [listing, bidding, notification]
+    depends_on: [rabbitmq, listing, bidding, notification]   # nginx proxies /mq/queues to rabbitmq
     restart: unless-stopped
 
 volumes:
