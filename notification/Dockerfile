@@ -1,14 +1,13 @@
-# Build context is the repo root (see docker-compose.yml) so ./shared is available.
-FROM golang:1.23-alpine AS build
+FROM golang:1.22-alpine AS build
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN go mod download
-COPY shared ./shared
-COPY notification ./notification
-RUN CGO_ENABLED=0 go build -o /out/app ./notification
+COPY . .
+RUN CGO_ENABLED=0 go build -o /notification ./cmd/notification
 
 FROM alpine:3.20
-RUN apk add --no-cache wget
-COPY --from=build /out/app /app
+RUN adduser -D -H app
+COPY --from=build /notification /notification
+USER app
 EXPOSE 8005
-ENTRYPOINT ["/app"]
+ENTRYPOINT ["/notification"]

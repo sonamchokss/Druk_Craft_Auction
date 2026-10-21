@@ -153,12 +153,14 @@ func declareTopology(ch *amqp.Channel) error {
 	if _, err := ch.QueueDeclare(dlqName, true, false, false, false, nil); err != nil {
 		return err
 	}
-	if err := ch.QueueBind(dlqName, dlqName, dlxName, false, nil); err != nil {
+	// docs/events.md §5: dead-letter routing key is the *queue* name. Every
+	// service declares this queue, and RabbitMQ rejects (406) mismatched args.
+	if err := ch.QueueBind(dlqName, queueName, dlxName, false, nil); err != nil {
 		return err
 	}
 	args := amqp.Table{
 		"x-dead-letter-exchange":    dlxName,
-		"x-dead-letter-routing-key": dlqName,
+		"x-dead-letter-routing-key": queueName,
 	}
 	if _, err := ch.QueueDeclare(queueName, true, false, false, false, args); err != nil {
 		return err
@@ -503,7 +505,7 @@ func startListing(w http.ResponseWriter, r *http.Request) {
 	// Publish BEFORE commit: if RabbitMQ is down the status change is rolled back.
 	eventID, err := broker.Publish(r.Context(), "auction.started", "AuctionStarted", map[string]any{
 		"auctionId":  auctionID,
-		"itemId":     it.ID,
+		"itemId":     strconv.Itoa(it.ID), // contract: all IDs are strings
 		"itemTitle":  it.Title,
 		"artisanId":  it.ArtisanID,
 		"startPrice": it.StartPrice,

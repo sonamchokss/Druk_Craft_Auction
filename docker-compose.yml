@@ -69,7 +69,7 @@ services:
 
   bidding:
     <<: *service
-    build: ./bidding
+    build: { context: ., dockerfile: bidding/Dockerfile }   # needs repo root for go.mod + shared/
     container_name: druk-bidding
     ports: ["8002:8002"]
     environment:
@@ -84,7 +84,7 @@ services:
 
   timer:
     <<: *service
-    build: ./timer
+    build: { context: ., dockerfile: timer/Dockerfile }     # needs repo root for go.mod + shared/
     container_name: druk-timer
     ports: ["8003:8003"]
     environment:
@@ -99,7 +99,7 @@ services:
 
   payment:
     <<: *service
-    build: ./payment
+    build: { context: ., dockerfile: payment/Dockerfile }   # needs repo root for go.mod + shared/
     container_name: druk-payment
     ports: ["8004:8004"]
     environment:
@@ -130,7 +130,7 @@ services:
   frontend:
     build: ./frontend
     container_name: druk-frontend
-    ports: ["3000:80"]   # Sonam Wangmo: change if your container serves on another port
+    ports: ["3000:3000"]   # nginx.conf listens on 3000
     depends_on: [listing, bidding, notification]
     restart: unless-stopped
 
