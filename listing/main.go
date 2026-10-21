@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS items (
 	receipt_no       TEXT,
 	created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Added after the first release; ALTER keeps existing databases working.
+ALTER TABLE items ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Handicraft';
 CREATE TABLE IF NOT EXISTS processed_events (
 	event_id     TEXT PRIMARY KEY,
 	processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -80,10 +82,11 @@ type Item struct {
 	FinalPrice      *int       `json:"finalPrice"`
 	ReceiptNo       *string    `json:"receiptNo"`
 	CreatedAt       time.Time  `json:"createdAt"`
+	Category        string     `json:"category"`
 }
 
 const itemCols = `id, title, description, image_url, artisan_id, start_price, duration_seconds,
-	status, auction_id, ends_at, winner_id, final_price, receipt_no, created_at`
+	status, auction_id, ends_at, winner_id, final_price, receipt_no, created_at, category`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -91,7 +94,7 @@ func scanItem(s scanner) (Item, error) {
 	var it Item
 	err := s.Scan(&it.ID, &it.Title, &it.Description, &it.ImageURL, &it.ArtisanID,
 		&it.StartPrice, &it.DurationSeconds, &it.Status, &it.AuctionID, &it.EndsAt,
-		&it.WinnerID, &it.FinalPrice, &it.ReceiptNo, &it.CreatedAt)
+		&it.WinnerID, &it.FinalPrice, &it.ReceiptNo, &it.CreatedAt, &it.Category)
 	return it, err
 }
 
@@ -431,6 +434,7 @@ type createReq struct {
 	ArtisanID       string `json:"artisanId"`
 	StartPrice      int    `json:"startPrice"`
 	DurationSeconds int    `json:"durationSeconds"`
+	Category        string `json:"category"`
 }
 
 func createListing(w http.ResponseWriter, r *http.Request) {
@@ -455,10 +459,14 @@ func createListing(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "durationSeconds must be greater than 0")
 		return
 	}
+	req.Category = strings.TrimSpace(req.Category)
+	if req.Category == "" {
+		req.Category = "Handicraft"
+	}
 	row := db.QueryRowContext(r.Context(),
-		`INSERT INTO items(title, description, image_url, artisan_id, start_price, duration_seconds)
-		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING `+itemCols,
-		req.Title, req.Description, req.ImageURL, req.ArtisanID, req.StartPrice, req.DurationSeconds)
+		`INSERT INTO items(title, description, image_url, artisan_id, start_price, duration_seconds, category)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING `+itemCols,
+		req.Title, req.Description, req.ImageURL, req.ArtisanID, req.StartPrice, req.DurationSeconds, req.Category)
 	it, err := scanItem(row)
 	if err != nil {
 		log.Printf("service=%s createListing error: %v", serviceName, err)
