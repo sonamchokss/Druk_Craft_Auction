@@ -1,0 +1,5 @@
+import { Heart, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useCountdown } from '../hooks/useCountdown'
+import { money } from '../state/AppContext'
+export function AuctionCard({ item }) { const { label, expired } = useCountdown(item.endsAt); return <article className="auction-card"><Link to={`/auction/${item.id}`} className="card-image"><img src={item.photoUrl} alt={item.title} /><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span><button className="heart" onClick={(event) => event.preventDefault()} aria-label="Save auction"><Heart size={17} /></button></Link><div className="card-body"><small className="eyebrow">{item.category} · by {item.artisan}</small><Link to={`/auction/${item.id}`}><h3>{item.title}</h3></Link><div className="card-meta"><span><small>Current bid</small><strong>{money(item.currentBid)}</strong></span><span className={expired ? 'timer expired' : 'timer'}><small>{expired ? 'Ended' : 'Time left'}</small><strong>{expired ? 'Closed' : label}</strong></span></div><div className="bid-count"><Users size={14} /> {item.bids} bids</div></div></article> }
