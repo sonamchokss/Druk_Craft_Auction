@@ -1,0 +1,21 @@
+# Go
+*.exe
+*.log
+*.test
+*.out
+/bin/
+vendor/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Env & editors
+.env
+.idea/
+.vscode/
+.DS_Store
+
+# Python
+__pycache__/

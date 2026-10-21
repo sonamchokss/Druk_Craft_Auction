@@ -1,0 +1,159 @@
+name: druk-craft-auction
+
+# Settings shared by all application services
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+x-env: &env
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
+
+services:
+  # ---------- Infrastructure ----------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: druk-rabbitmq
+    # Infra ports are localhost-only: they use default credentials and must not be
+    # reachable from other machines (e.g. campus Wi-Fi during the demo). Services
+    # reach them over the Docker network, so this changes nothing for the app.
+    ports:
+      - "127.0.0.1:5672:5672"     # AMQP
+      - "127.0.0.1:15672:15672"   # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: druk-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------- Microservices ----------
+  listing:
+    <<: *service
+    build: ./listing
+    container_name: druk-listing
+    ports: ["8001:8001"]
+    environment:
+      <<: *env
+      PORT: "8001"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/listings_db?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bidding:
+    <<: *service
+    build: { context: ., dockerfile: bidding/Dockerfile }   # needs repo root for go.mod + shared/
+    container_name: druk-bidding
+    ports: ["8002:8002"]
+    environment:
+      <<: *env
+      PORT: "8002"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/bids_db?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timer:
+    <<: *service
+    build: { context: ., dockerfile: timer/Dockerfile }     # needs repo root for go.mod + shared/
+    container_name: druk-timer
+    ports: ["8003:8003"]
+    environment:
+      <<: *env
+      PORT: "8003"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/timers_db?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment:
+    <<: *service
+    build: { context: ., dockerfile: payment/Dockerfile }   # needs repo root for go.mod + shared/
+    container_name: druk-payment
+    ports: ["8004:8004"]
+    environment:
+      <<: *env
+      PORT: "8004"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/payments_db?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8004/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification:
+    <<: *service
+    build: ./notification
+    container_name: druk-notification
+    ports: ["8005:8005"]
+    environment:
+      <<: *env
+      PORT: "8005"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/notifications_db?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8005/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Admin-panel demo controls: stop/start services, re-send an event (T8),
+  # send a malformed event (T9). It can drive Docker, so its port is
+  # localhost-only and it accepts requests only from the frontend's pages.
+  control:
+    build: { context: ., dockerfile: control/Dockerfile }
+    container_name: druk-control
+    ports: ["127.0.0.1:8099:8099"]
+    environment:
+      <<: *env
+      PORT: "8099"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: druk-frontend
+    ports: ["3000:3000"]   # nginx.conf listens on 3000
+    depends_on: [rabbitmq, listing, bidding, notification]   # nginx proxies /mq/queues to rabbitmq
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

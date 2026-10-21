@@ -1,0 +1,1 @@
+export function Toast({ toast }) { return toast ? <div className={`toast toast-${toast.tone || 'info'}`} role="status" aria-live="polite"><span>{toast.tone === 'warning' ? '!' : '✓'}</span>{toast.message}</div> : null }
