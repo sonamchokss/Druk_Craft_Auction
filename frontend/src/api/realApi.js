@@ -1,4 +1,5 @@
 import { config } from './config'
+import { nameOf } from '../state/users'
 
 async function request(base, path, options = {}) {
   const response = await fetch(`${base}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options })
@@ -39,9 +40,9 @@ function toItem(listing, summary) {
     auctionId: listing.auctionId,
     title: listing.title,
     description: listing.description,
-    category: 'Handicraft',
+    category: listing.category || 'Handicraft',
     artisanId: listing.artisanId,
-    artisan: listing.artisanId,
+    artisan: nameOf(listing.artisanId),
     photoUrl: listing.imageUrl || fallbackPhoto,
     startPrice: listing.startPrice,
     duration: Math.round(listing.durationSeconds / 60),
@@ -95,6 +96,7 @@ const listingsApi = {
       description: data.description || '',
       imageUrl: data.photoUrl,
       artisanId: data.artisanId,
+      category: data.category,
       startPrice: data.startPrice,
       durationSeconds: data.duration * 60,
     }),
@@ -132,6 +134,15 @@ export const realApi = {
   health: (base = config.listing) => request(base, '/health'),
   // Read-only queue counts, proxied by the frontend's nginx (see nginx.conf).
   queues: () => request('', '/mq/queues'),
+  // Demo controls (control service, host laptop only).
+  control: {
+    services: () => request(config.control, '/services'),
+    stop: (name) => request(config.control, `/services/${name}/stop`, { method: 'POST' }),
+    start: (name) => request(config.control, `/services/${name}/start`, { method: 'POST' }),
+    // Sends the envelope unchanged, so its eventId is the same (duplicate test).
+    resend: (envelope) => request(config.control, '/events/resend', { method: 'POST', body: JSON.stringify(envelope) }),
+    poison: () => request(config.control, '/events/poison', { method: 'POST' }),
+  },
   // Raw event stream for the admin feed and live room updates (replays the last 50 on connect).
   subscribe: (listener) => socket('/ws/events', listener),
   // This user's notifications as Notification stores them, pushed live.

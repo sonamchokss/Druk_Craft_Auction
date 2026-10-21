@@ -14,4 +14,6 @@ export const config = {
   notification: at(import.meta.env.VITE_NOTIFICATION_API, 8005),
   notificationWs: at(import.meta.env.VITE_NOTIFICATION_WS, 8005, 'ws'),
   rabbit: at(import.meta.env.VITE_RABBIT_MGMT, 15672),
+  // Demo controls; compose binds this port to localhost, so they only work on the host laptop.
+  control: at(import.meta.env.VITE_CONTROL_API, 8099),
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/sonamchokss/druk-craft-auction/notification/internal/store"
@@ -58,7 +59,12 @@ func (a *API) read(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	id := strings.TrimPrefix(r.URL.Path, "/notifications/")
+	// PATCH /notifications/{id}/read (as documented); /notifications/{id} also works.
+	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/notifications/"), "/read")
+	if _, err := strconv.ParseInt(id, 10, 64); err != nil {
+		http.Error(w, "invalid notification id", http.StatusBadRequest)
+		return
+	}
 	if err := a.Store.MarkRead(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), 404)
 		return

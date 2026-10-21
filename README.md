@@ -15,12 +15,26 @@ docker compose up --build
 | Listing / Bidding / Timer / Payment / Notification | http://localhost:8001 … 8005 (`GET /health`) |
 | RabbitMQ management UI | http://localhost:15672 — `guest` / `guest` |
 | Postgres | `localhost:5432` — `postgres` / `postgres` |
+| Control service (admin demo buttons) | http://localhost:8099 |
 
-RabbitMQ and Postgres listen on this machine only. Reset all data (DBs + queues): `docker compose down -v`.
+RabbitMQ, Postgres and the control service listen on this machine only. Reset all data (DBs + queues): `docker compose down -v`.
 
 ### Two-laptop demo
 
 Run the stack on laptop 1. On laptop 2 (same network) open `http://<laptop-1-ip>:3000`. The frontend calls the services on whatever host it was loaded from, so nothing needs configuring. Pick a different buyer in the user menu on each laptop. If laptop 2 can't connect, allow ports 3000 and 8001–8005 through laptop 1's firewall.
+
+### Failure demo from the Control room (`/admin`, plan §6.1)
+
+| Test | In the UI |
+|---|---|
+| T6 consumer down | **Stop** on Payment, let an auction with a bid end → `payment` shows 1 waiting |
+| T7 recovery | **Start** on Payment → the queue drains, the item turns Sold |
+| T8 duplicate | Expand the `AuctionClosed` event → **Re-send this event** (same `eventId`) → logs show `duplicate-skipped`, no second charge |
+| T9 poison | **Send malformed event** → retried 3×, then 1 message in each `*.dlq` bound to `auction.closed` |
+
+These buttons call the control service, which can stop and start containers through Docker. It is bound to `127.0.0.1`, only accepts requests from the frontend's own pages, and can only touch the five app services. That's why the buttons are disabled on the second laptop.
+
+Auctions shorter than 30 s are extended by the anti-sniping rule as soon as anyone bids, so use at least 45 s for the failure demo.
 
 ## Layout
 
@@ -36,6 +50,7 @@ shared/             ← Go code shared by bidding, timer and payment
   service/          common bootstrap: DB + RabbitMQ + GET /health + CORS
 bidding/  timer/  payment/       ← use the root go.mod and shared/
 listing/  notification/          ← own go.mod; build from their own folder
+control/            admin demo controls (stop/start, re-send, poison)
 frontend/           React + Vite, served by nginx on :3000
 db/init/            creates the five databases
 ```

@@ -130,6 +130,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Admin-panel demo controls: stop/start services, re-send an event (T8),
+  # send a malformed event (T9). It can drive Docker, so its port is
+  # localhost-only and it accepts requests only from the frontend's pages.
+  control:
+    build: { context: ., dockerfile: control/Dockerfile }
+    container_name: druk-control
+    ports: ["127.0.0.1:8099:8099"]
+    environment:
+      <<: *env
+      PORT: "8099"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
     container_name: druk-frontend
