@@ -1,6 +1,6 @@
 # Druk Craft Auction frontend
 
-The React/Vite frontend for the event-driven Bhutanese handicraft auction. The interface is designed to run independently in mock mode for demos, while the API modules mirror the backend contracts for real service integration.
+The React/Vite frontend for the event-driven Bhutanese handicraft auction. It talks to the real services by default; an in-browser mock is available for UI work without the backend.
 
 ## Run locally
 
@@ -9,11 +9,13 @@ npm install
 npm run dev
 ```
 
-Mock mode is on by default. To use backend services, create `.env.local` from `.env.example` and set `VITE_USE_MOCK=false`. The app then uses the configured listing, bidding, payment, and notification REST URLs.
+The app uses the real services by default. For UI work without the backend, create `.env.local` with `VITE_USE_MOCK=true`.
 
 ## Environment
 
-`VITE_USE_MOCK`, `VITE_LISTING_API` (8001), `VITE_BIDDING_API` (8002), `VITE_PAYMENT_API` (8004), `VITE_NOTIFICATION_API` and `VITE_NOTIFICATION_WS` (8005), and `VITE_RABBIT_MGMT` (15672).
+Service URLs default to the host the page was opened from (`http://<host>:8001` … `8005`), so the same build works on `localhost` and on a second laptop at `http://<host-ip>:3000`. Override with `VITE_LISTING_API`, `VITE_BIDDING_API`, `VITE_TIMER_API`, `VITE_PAYMENT_API`, `VITE_NOTIFICATION_API`, `VITE_NOTIFICATION_WS` or `VITE_RABBIT_MGMT` (see `.env.example`). Vite reads these at **build** time.
+
+`src/api/realApi.js` maps each service's JSON onto the shapes the pages use (the same shapes as `mockApi.js`). If a service changes its response, update that file.
 
 ## Folder layout
 
@@ -32,11 +34,11 @@ Mock mode is on by default. To use backend services, create `.env.local` from `.
 
 - [ ] Place a valid bid: it succeeds and appears immediately in bid history.
 - [ ] Place a bid below the minimum: “Bid too low” is shown without changing the current bid.
-- [ ] Place a bid in the last 10 seconds: the countdown resets to 30 seconds and the room flashes.
-- [ ] Switch to the previous bidder user: an outbid toast appears instantly.
+- [ ] Place a bid in the last 30 seconds: the end time moves 30 seconds later and the room flashes.
+- [ ] As the outbid user (e.g. on a second laptop): an outbid toast appears instantly.
 - [ ] Receive an event: the notification bell badge and dropdown update live.
-- [ ] Open `/admin`: the event stream shows color-coded events and expandable JSON.
-- [ ] Click “Re-send last event”: a duplicate event appears at the top of the stream.
+- [ ] Open `/admin`: the event stream shows color-coded events and expandable JSON; queue depth shows real RabbitMQ counts.
+- [ ] “Re-send last event” only copies the event in this page's list. For the real duplicate test (T8), re-publish the event from the RabbitMQ management UI.
 
 ## Docker
 
@@ -45,13 +47,4 @@ docker build -t druk-craft-frontend .
 docker run --rm -p 3000:3000 druk-craft-frontend
 ```
 
-The root compose file can use this service snippet:
-
-```yaml
-frontend:
-  build: ./frontend
-  ports:
-    - "3000:3000"
-  environment:
-    VITE_USE_MOCK: "true"
-```
+In the root `docker-compose.yml` it builds from `./frontend` and serves on port 3000. nginx also proxies `GET /mq/queues` to RabbitMQ for the admin panel's queue counts.
